@@ -1,21 +1,87 @@
 # -*- coding: utf-8 -*-
 """
-🎓 TAM KAPSAMLI İNGİLİZCE KURSU
-Her gün 15 dakikalık ders: Telaffuz + Kalıp + Gramer + Alıştırma + Tekrar
+🎓 TAM KAPSAMLI İNGİLİZCE KURSU v3
++ Streak takibi
++ İlerleme kaydı
++ Adaptif zorluk
++ Bağlam hikayesi
++ Çoklu alıştırma tipi
++ Telaffuz pratiği
++ Haftalık değerlendirme
 """
 
 import os
 import smtplib
+import json
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
-from datetime import datetime
+from datetime import datetime, timedelta
 
 MAIL_USER = os.environ.get("MAIL_USER")
 MAIL_PASS = os.environ.get("MAIL_PASS")
 MAIL_TO = os.environ.get("MAIL_TO")
 
 # ============================================================
-# BÖLÜM 1: TELAFFUZ DERSLERİ (30 KURAL)
+# İLERLEME TAKİBİ (STATE)
+# ============================================================
+STATE_FILE = "state.json"
+
+def load_state():
+    """Önceki ilerlemeyi yükler."""
+    if os.path.exists(STATE_FILE):
+        try:
+            with open(STATE_FILE, 'r', encoding='utf-8') as f:
+                return json.load(f)
+        except:
+            pass
+    return {
+        "streak": 0,
+        "last_run_date": "",
+        "total_lessons": 0,
+        "seen_words": [],
+        "word_scores": {},
+        "total_correct": 0,
+        "total_wrong": 0,
+        "start_date": str(datetime.now().date()),
+        "last_weekly_report": ""
+    }
+
+def save_state(state):
+    """İlerlemeyi kaydeder."""
+    with open(STATE_FILE, 'w', encoding='utf-8') as f:
+        json.dump(state, f, ensure_ascii=False, indent=2)
+
+def update_streak(state):
+    """Seri takibini günceller."""
+    today = str(datetime.now().date())
+    yesterday = str((datetime.now() - timedelta(days=1)).date())
+    
+    if state["last_run_date"] == today:
+        pass  # Bugün zaten çalıştı
+    elif state["last_run_date"] == yesterday:
+        state["streak"] += 1
+    else:
+        state["streak"] = 1
+    
+    state["last_run_date"] = today
+    state["total_lessons"] += 1
+    return state
+
+def get_streak_message(streak):
+    """Streak mesajı üretir."""
+    if streak == 1:
+        return "🔥 Yeni bir seri başladı! Yarın da devam et."
+    elif streak < 7:
+        return f"🔥 {streak} gündür üst üste çalışıyorsun!"
+    elif streak < 30:
+        return f"🔥🔥 Harika! {streak} günlük seri!"
+    elif streak < 100:
+        return f"🔥🔥🔥 {streak} gün! Sen bir efsanesin!"
+    else:
+        return f"🏆 {streak} GÜN! İnanılmaz!"
+
+# ============================================================
+# BÖLÜM 1: TELAFFUZ DERSLERİ (16 KURAL)
 # ============================================================
 TELAFFUZ_DERSLERI = [
     {
@@ -232,14 +298,28 @@ TELAFFUZ_DERSLERI = [
             ("Let me help.", "Lemi help.", "Yardım edeyim.")
         ],
         "ipucu": "Resmi yazışmalarda kullanmayın ama günlük konuşmada normaldir."
+    },
+    {
+        "baslik": "Y ve J — Türkçe'de Yok",
+        "kural": "İngilizce Y ve J harfleri Türkçe'den farklı okunur.",
+        "detay": "Y: 'y' değil, 'y' ve 'i' arası bir ses (yes → YES)\nJ: 'c' sesi (job → COB)",
+        "ornekler": [
+            ("yes", "YES", "evet"),
+            ("you", "YU", "sen"),
+            ("year", "YİIR", "yıl"),
+            ("job", "COB", "iş"),
+            ("jump", "CAMP", "zıplamak"),
+            ("enjoy", "en-COY", "keyif almak")
+        ],
+        "ipucu": "J'yi 'c' gibi söyleyin: 'job' = 'cob'."
     }
 ]
 
 # ============================================================
-# BÖLÜM 2: KALIP DERSLERİ (150+ KALIP, 10 TEMA)
+# BÖLÜM 2: KALIP DERSLERİ (150 KALIP, 10 TEMA)
 # ============================================================
 KALIP_DERSLERI = [
-    # ===== TEMA 1: SELAMLAŞMA VE TANIŞMA (15 kalıp) =====
+    # TEMA 1: SELAMLAŞMA (15 kalıp)
     ("👋 SELAMLAŞMA", "Hello!", "he-LOU", "Merhaba!", "Hello! How are you?"),
     ("👋 SELAMLAŞMA", "Good morning!", "gud MOR-ning", "Günaydın!", "Good morning, everyone!"),
     ("👋 SELAMLAŞMA", "How are you?", "hau ar YU", "Nasılsın?", "Hi Ali, how are you?"),
@@ -256,7 +336,7 @@ KALIP_DERSLERI = [
     ("👋 SELAMLAŞMA", "How's it going?", "hauz it GOU-ing", "Nasıl gidiyor?", "Hey man, how's it going?"),
     ("👋 SELAMLAŞMA", "Long time no see!", "long TAYM nou Sİİ", "Ne zamandır görüşemedik!", "Long time no see!"),
 
-    # ===== TEMA 2: İŞ YERİ (15 kalıp) =====
+    # TEMA 2: İŞ YERİ (15 kalıp)
     ("💼 İŞ YERİ", "Let's get started.", "lets get STAR-tıd", "Başlayalım.", "Let's get started with the agenda."),
     ("💼 İŞ YERİ", "Could you give me an update?", "kud yu giv mi ın AP-deyt", "Güncel durumu aktarır mısınız?", "Could you give me an update on the project?"),
     ("💼 İŞ YERİ", "Let me check and get back to you.", "let mi çek end get BEK tu yu", "Kontrol edip döneyim.", "Let me check and get back to you tomorrow."),
@@ -273,7 +353,7 @@ KALIP_DERSLERI = [
     ("💼 İŞ YERİ", "I'm afraid I can't make it.", "aym ı-FREYD ay kent MEYK it", "Maalesef gelemeyeceğim.", "I'm afraid I can't make it to the meeting."),
     ("💼 İŞ YERİ", "Sorry to keep you waiting.", "SO-ri tı KİİP yu VEY-ting", "Beklettiğim için özür dilerim.", "Sorry to keep you waiting."),
 
-    # ===== TEMA 3: RESTORAN VE YEMEK (15 kalıp) =====
+    # TEMA 3: RESTORAN (15 kalıp)
     ("🍽️ RESTORAN", "A table for two, please.", "ı TEY-bıl for TU pliiz", "İki kişilik masa, lütfen.", "A table for two, please."),
     ("🍽️ RESTORAN", "Could I see the menu?", "kud ay sii dı MEN-yu", "Menüyü görebilir miyim?", "Could I see the menu, please?"),
     ("🍽️ RESTORAN", "What do you recommend?", "vat du yu re-kı-MEND", "Ne tavsiye edersiniz?", "What do you recommend as a starter?"),
@@ -290,7 +370,7 @@ KALIP_DERSLERI = [
     ("🍽️ RESTORAN", "Could we split the bill?", "kud vi SPLİT dı BİL", "Hesabı bölüşebilir miyiz?", "Could we split the bill?"),
     ("🍽️ RESTORAN", "Can I have the check, please?", "ken ay hev dı ÇEK pliiz", "Hesap lütfen.", "Can I have the check, please?"),
 
-    # ===== TEMA 4: SEYAHAT (15 kalıp) =====
+    # TEMA 4: SEYAHAT (15 kalıp)
     ("✈️ SEYAHAT", "Where is the check-in counter?", "ver iz dı ÇEK-in KAUN-tır", "Check-in nerede?", "Excuse me, where is the check-in counter?"),
     ("✈️ SEYAHAT", "I'd like to book a room.", "ayd layk tı BUK ı RUUM", "Oda ayırtmak istiyorum.", "I'd like to book a room for two nights."),
     ("✈️ SEYAHAT", "What time is check-out?", "vat taym iz ÇEK-aut", "Çıkış saati kaçta?", "What time is check-out?"),
@@ -307,7 +387,7 @@ KALIP_DERSLERI = [
     ("✈️ SEYAHAT", "Go straight, then turn left.", "gou STREYT, dhen TIRN LEFT", "Düz git, sonra sola dön.", "Go straight, then turn left."),
     ("✈️ SEYAHAT", "One ticket, please.", "VAN Tİ-kıt pliiz", "Bir bilet, lütfen.", "One ticket to London, please."),
 
-    # ===== TEMA 5: ALIŞVERİŞ (15 kalıp) =====
+    # TEMA 5: ALIŞVERİŞ (15 kalıp)
     ("🛒 ALIŞVERİŞ", "How much is this?", "hau MAÇ iz DHİS", "Bu ne kadar?", "How much is this shirt?"),
     ("🛒 ALIŞVERİŞ", "Do you have this in a different size?", "du yu hev dhis in ı DİF-rınt SAYZ", "Farklı bedeni var mı?", "Do you have this in a different size?"),
     ("🛒 ALIŞVERİŞ", "I'm just looking, thanks.", "aym cast LU-king THENKS", "Sadece bakıyorum, teşekkürler.", "I'm just looking, thanks."),
@@ -324,7 +404,7 @@ KALIP_DERSLERI = [
     ("🛒 ALIŞVERİŞ", "I'm looking for...", "aym LU-king for", "...arıyorum.", "I'm looking for a black jacket."),
     ("🛒 ALIŞVERİŞ", "Do you have this in black?", "du yu hev dhis in BLEK", "Bunun siyahı var mı?", "Do you have this in black?"),
 
-    # ===== TEMA 6: YARDIM VE İLETİŞİM (15 kalıp) =====
+    # TEMA 6: YARDIM (15 kalıp)
     ("🆘 YARDIM", "Could you help me?", "kud yu HELP mi", "Yardım eder misiniz?", "Excuse me, could you help me?"),
     ("🆘 YARDIM", "I don't understand.", "ay dont an-dır-STEND", "Anlamıyorum.", "Sorry, I don't understand."),
     ("🆘 YARDIM", "Can you repeat that?", "ken yu ri-PİİT dhet", "Tekrar eder misiniz?", "Can you repeat that, please?"),
@@ -341,7 +421,7 @@ KALIP_DERSLERI = [
     ("🆘 YARDIM", "Just a moment, please.", "cast ı MOU-mınt pliiz", "Bir dakika lütfen.", "Just a moment, please."),
     ("🆘 YARDIM", "I'll be right back.", "ayl bii RAYT BEK", "Hemen döneceğim.", "I'll be right back."),
 
-    # ===== TEMA 7: DUYGULAR VE FİKİRLER (15 kalıp) =====
+    # TEMA 7: DUYGULAR (15 kalıp)
     ("💭 DUYGULAR", "I'm happy.", "aym HE-pi", "Mutluyum.", "I'm happy to see you."),
     ("💭 DUYGULAR", "I'm tired.", "aym TAY-ırd", "Yorgunum.", "I'm tired today."),
     ("💭 DUYGULAR", "I'm hungry.", "aym HANG-ri", "Açım.", "I'm hungry, let's eat."),
@@ -358,7 +438,7 @@ KALIP_DERSLERI = [
     ("💭 DUYGULAR", "Never mind.", "NE-vır MAYND", "Önemli değil.", "Never mind, it's okay."),
     ("💭 DUYGULAR", "It doesn't matter.", "it DA-zınt ME-tır", "Önemli değil.", "It doesn't matter to me."),
 
-    # ===== TEMA 8: SOSYAL HAYAT (15 kalıp) =====
+    # TEMA 8: SOSYAL (15 kalıp)
     ("👥 SOSYAL", "Would you like to join us?", "vud yu layk tı COYN as", "Bize katılmak ister misin?", "Would you like to join us for dinner?"),
     ("👥 SOSYAL", "That sounds great!", "dhet SAUNDZ GREYT", "Kulağa harika geliyor!", "That sounds great! I'd love to."),
     ("👥 SOSYAL", "Maybe next time.", "MEY-bi nekst TAYM", "Belki bir dahaki sefere.", "Sorry, maybe next time."),
@@ -375,7 +455,7 @@ KALIP_DERSLERI = [
     ("👥 SOSYAL", "Let me know.", "let mi NOU", "Haber ver.", "Let me know if you can come."),
     ("👥 SOSYAL", "Sounds like a plan.", "SAUNDZ layk ı PLEN", "Plan gibi görünüyor.", "Sounds like a plan!"),
 
-    # ===== TEMA 9: İŞ E-POSTA (15 kalıp) =====
+    # TEMA 9: İŞ E-POSTA (15 kalıp)
     ("📧 E-POSTA", "Dear Sir/Madam,", "DİR SIR/ME-dım", "Sayın Yetkili,", "Dear Sir/Madam, I am writing to..."),
     ("📧 E-POSTA", "I'm writing to inquire about...", "aym RAY-ting tu in-KVAYR ı-BAUT", "...hakkında bilgi almak için yazıyorum.", "I'm writing to inquire about the position."),
     ("📧 E-POSTA", "Please find attached...", "pliiz FAYND ı-TEÇT", "Ekte bulabilirsiniz...", "Please find attached the report."),
@@ -392,7 +472,7 @@ KALIP_DERSLERI = [
     ("📧 E-POSTA", "I'll transfer you.", "ayl TRANS-fır yu", "Sizi yönlendireceğim.", "I'll transfer you to the right department."),
     ("📧 E-POSTA", "Sorry, wrong number.", "SO-ri, RONG NAM-bır", "Üzgünüm, yanlış numara.", "Sorry, wrong number."),
 
-    # ===== TEMA 10: SUNUM VE MÜZAKERE (15 kalıp) =====
+    # TEMA 10: SUNUM (15 kalıp)
     ("📊 SUNUM", "Let's move on to the next point.", "lets MUUV an tu dı NEKST POYNT", "Bir sonraki konuya geçelim.", "Let's move on to the next point."),
     ("📊 SUNUM", "As you can see from the chart...", "ez yu ken Sİİ frım dı ÇART", "Grafikten de görebileceğiniz gibi...", "As you can see from the chart, sales are up."),
     ("📊 SUNUM", "Sales increased by 10%.", "seylz in-KRİİST bay ten pır-SENT", "Satışlar %10 arttı.", "Sales increased by 10% last quarter."),
@@ -411,207 +491,239 @@ KALIP_DERSLERI = [
 ]
 
 # ============================================================
-# BÖLÜM 3: GRAMER DERSLERİ (30 DERS, SIFIRDAN)
+# BÖLÜM 3: GRAMER DERSLERİ (30 DERS)
 # ============================================================
 GRAMER_DERSLERI = [
     ("Ders 1: Alfabe ve Sesler",
      "İngilizce alfabede 26 harf var. Ancak 44 ses vardır. Yani harfler her zaman aynı sesi vermez.",
      "A = 'ey' | B = 'bi' | C = 'si' | D = 'di' | E = 'i' | F = 'ef' | G = 'ci' | H = 'eyç' | I = 'ay' | J = 'cey' | K = 'key' | L = 'el' | M = 'em' | N = 'en' | O = 'ou' | P = 'pi' | Q = 'kyu' | R = 'ar' | S = 'es' | T = 'ti' | U = 'yu' | V = 'vi' | W = 'dabılyu' | X = 'eks' | Y = 'vay' | Z = 'zi'",
-     "Örnek: 'cat' 3 harf ama tek hece: KET. 'e' harfi burada 'e' sesi verir."),
-
+     "Örnek: 'cat' 3 harf ama tek hece: KET."),
     ("Ders 2: To Be Fiili (am, is, are)",
      "İngilizce'nin temelidir. Türkçe'de 'ben öğretmenim' derken 'im' eki kullanılır. İngilizce'de ayrı bir kelime kullanılır: am/is/are.",
-     "I am (ay em) = Ben ...-im | You are (yu ar) = Sen ...-sin | He is (hi iz) = O (erkek) ...-dir | She is (şi iz) = O (kadın) ...-dir | It is (it iz) = O (nesne) ...-dir | We are (vi ar) = Biz ...-iz | They are (dhey ar) = Onlar ...-dir",
+     "I am (ay em) | You are (yu ar) | He is (hi iz) | She is (şi iz) | It is (it iz) | We are (vi ar) | They are (dhey ar)",
      "Örnek: I am a teacher (ay em ı Tİİ-çır) = Ben bir öğretmenim."),
-
     ("Ders 3: İşaret Zamirleri",
-     "Bir şeyi işaret ederken kullanılır. Yakındaki ve uzaktaki nesneler için farklı kelimeler vardır.",
-     "YAKIN: This (dhis) = Bu (tekil) | These (dhiiz) = Bunlar (çoğul)\nUZAK: That (dhet) = Şu (tekil) | Those (dhouz) = Şunlar (çoğul)",
+     "Bir şeyi işaret ederken kullanılır.",
+     "This (dhis) = Bu | These (dhiiz) = Bunlar | That (dhet) = Şu | Those (dhouz) = Şunlar",
      "Örnek: This is a book (dhis iz ı BUK) = Bu bir kitap."),
-
     ("Ders 4: Basit Şimdiki Zaman",
-     "Her gün yapılan alışkanlıkları anlatır. 'I/You/We/They' ile fiil yalın, 'He/She/It' ile fiile -s eklenir.",
-     "I work (ay VIRK) = Çalışırım | You work (yu VIRK) = Çalışırsın | He works (hi VIRKS) = Çalışır | She works (şi VIRKS) = Çalışır | We work (vi VIRK) = Çalışırız",
+     "Her gün yapılan alışkanlıkları anlatır.",
+     "I work | You work | He works | She works | We work | They work",
      "⚠️ He/She/It ile fiile MUTLAKA -s eklenir!"),
-
     ("Ders 5: Şimdiki Zaman (Şu An)",
-     "Şu anda devam eden eylemleri anlatır. 'am/is/are' + fiil+ing şeklinde kurulur.",
-     "I am working (ay em VIR-king) = Şu an çalışıyorum | She is reading (şi iz Rİİ-ding) = Okuyor | They are playing (dhey ar PLEY-ing) = Oynuyorlar",
+     "Şu anda devam eden eylemleri anlatır.",
+     "I am working | She is reading | They are playing",
      "⚠️ 'am/is/are' ile fiilin -ing hali birlikte kullanılır."),
-
     ("Ders 6: Geçmiş Zaman",
-     "Geçmişte olan olayları anlatır. Düzenli fiiller -ed alır, düzensiz fiiller değişir.",
-     "Düzenli: work → worked (VIRKT) | play → played (PELYD) | Düzensiz: go → went (VENT) | eat → ate (EYT) | see → saw (SO)",
-     "Örnek: I worked yesterday (ay VIRKT YES-tır-dey) = Dün çalıştım."),
-
+     "Geçmişte olan olayları anlatır.",
+     "work → worked | play → played | go → went | eat → ate | see → saw",
+     "Örnek: I worked yesterday = Dün çalıştım."),
     ("Ders 7: Gelecek Zaman (Will)",
-     "Gelecekte olacak olayları anlatır. 'will + fiil' şeklinde kurulur.",
-     "I will go (ay vil GOU) = Gideceğim | She will come (şi vil KAM) = Gelecek | We will see (vi vil Sİİ) = Göreceğiz",
-     "💡 Kısaltma: I will = I'll (ayl) | She will = She'll (şil)"),
-
+     "Gelecekte olacak olayları anlatır.",
+     "I will go | She will come | We will see",
+     "💡 Kısaltma: I will = I'll | She will = She'll"),
     ("Ders 8: Sahiplik Sıfatları",
-     "Bir şeyin kime ait olduğunu gösterir. Türkçe'deki '-im, -in, -i' eklerinin karşılığıdır.",
-     "My (may) = Benim | Your (yor) = Senin | His (hiz) = Onun (erkek) | Her (hır) = Onun (kadın) | Its (its) = Onun (nesne) | Our (aur) = Bizim | Their (dheir) = Onların",
-     "Örnek: My book (may BUK) = Benim kitabım"),
-
+     "Bir şeyin kime ait olduğunu gösterir.",
+     "My (benim) | Your (senin) | His (onun-e) | Her (onun-k) | Its (onun-n) | Our (bizim) | Their (onların)",
+     "Örnek: My book = Benim kitabım"),
     ("Ders 9: Çoğul Yapma",
-     "İngilizce'de çoğul yapmak için kelimenin sonuna -s veya -es eklenir. Bazı kelimeler düzensizdir.",
-     "book → books (BUKS) | box → boxes (BAK-sız) | city → cities (Sİ-tiz) | child → children (ÇİL-drın) ⚠️ | man → men (MEN) ⚠️ | woman → women (Vİ-mın) ⚠️",
+     "İngilizce'de çoğul yapmak için -s veya -es eklenir.",
+     "book → books | box → boxes | city → cities | child → children ⚠️ | man → men ⚠️ | woman → women ⚠️",
      "💡 -s, -ss, -sh, -ch, -x ile bitenler -es alır."),
-
     ("Ders 10: Soru Cümleleri",
-     "İngilizce'de soru sormak için soru kelimesi kullanılır. Kelime başa gelir.",
-     "What (VAT) = Ne | Where (VER) = Nerede | When (VEN) = Ne zaman | Who (HU) = Kim | Why (VAY) = Neden | How (HAU) = Nasıl",
-     "Örnek: Where are you? (VER ar yu) = Neredesin?"),
-
+     "İngilizce'de soru sormak için soru kelimesi kullanılır.",
+     "What (ne) | Where (nerede) | When (ne zaman) | Who (kim) | Why (neden) | How (nasıl)",
+     "Örnek: Where are you? = Neredesin?"),
     ("Ders 11: Olumsuz Cümleler",
-     "Bir şeyi reddetmek için kullanılır. 'am/is/are' fiillerinden sonra NOT gelir. Diğer fiiller için do/does + not kullanılır.",
-     "I am not (ay em NAT) = Değilim | She is not (şi iz NAT) = Değil | I do not work (ay du NAT VIRK) = Çalışmam | She does not work (şi daz NAT VIRK) = Çalışmaz",
+     "Bir şeyi reddetmek için kullanılır.",
+     "I am not | She is not | I do not work | She does not work",
      "💡 Kısaltma: is not = isn't | do not = don't | does not = doesn't"),
-
     ("Ders 12: There is / There are",
-     "Bir şeyin var olduğunu söylemek için kullanılır. Türkçe'deki 'var' kelimesinin karşılığıdır.",
-     "There is a book (dher iz ı BUK) = Bir kitap var (tekil) | There are books (dher ar BUKS) = Kitaplar var (çoğul) | Is there a book? (iz dher ı BUK) = Kitap var mı?",
+     "Bir şeyin var olduğunu söylemek için kullanılır.",
+     "There is a book | There are books | Is there a book?",
      "💡 Tekil için 'There is', çoğul için 'There are'"),
-
     ("Ders 13: Can / Cannot",
-     "'Can' yetenek ve izin için kullanılır. Türkçe'deki '-ebilmek' ekine karşılık gelir.",
-     "I can swim (ay ken SVİM) = Yüzebilirim | She can drive (şi ken DRAYV) = Araba sürebilir | I cannot come (ay KE-not KAM) = Gelemem | Can you help? (ken yu HELP) = Yardım edebilir misin?",
-     "⚠️ 'Can' ile fiil arasına 'to' gelmez: I can to swim ❌"),
-
+     "'Can' yetenek ve izin için kullanılır.",
+     "I can swim | She can drive | I cannot come | Can you help?",
+     "⚠️ 'Can' ile fiil arasına 'to' gelmez."),
     ("Ders 14: Karşılaştırma",
-     "İki şeyi karşılaştırmak için kullanılır. Kısa sıfatlara -er, uzun sıfatlara 'more' eklenir.",
-     "Big → bigger (Bİ-gır) = daha büyük | Cheap → cheaper (Çİİ-pır) = daha ucuz | Expensive → more expensive (mor eks-PEN-siv) = daha pahalı | Good → better (BE-tır) ⚠️ | Bad → worse (VIRS) ⚠️",
-     "Örnek: This is cheaper than that (dhis iz Çİİ-pır dhen DHET) = Bu şundan daha ucuz."),
-
+     "İki şeyi karşılaştırmak için kullanılır.",
+     "Big → bigger | Cheap → cheaper | Expensive → more expensive | Good → better ⚠️ | Bad → worse ⚠️",
+     "Örnek: This is cheaper than that = Bu şundan daha ucuz."),
     ("Ders 15: Yer Edatları",
-     "Bir şeyin nerede olduğunu söylemek için kullanılır. Türkçe'de ekle yapılır, İngilizce'de ayrı kelimedir.",
-     "In (in) = içinde | On (on) = üstünde | Under (AN-dır) = altında | Behind (bi-HAYND) = arkasında | Next to (NEKST tu) = yanında | Between (bi-TVİİN) = arasında",
-     "Örnek: The book is on the table (BUK iz on dı TEY-bıl) = Kitap masanın üstünde."),
-
+     "Bir şeyin nerede olduğunu söylemek için kullanılır.",
+     "In (içinde) | On (üstünde) | Under (altında) | Behind (arkasında) | Next to (yanında) | Between (arasında)",
+     "Örnek: The book is on the table = Kitap masanın üstünde."),
     ("Ders 16: Zaman Edatları",
-     "Zamanı belirtmek için kullanılır. Saat, gün, ay ve yıl için farklı edatlar kullanılır.",
-     "AT + saat: at 5 o'clock (et FAYV o-KLOK) | ON + gün: on Monday (on MAN-dey) | IN + ay/yıl: in July (in cu-LAY), in 2026 (in tven-ti tven-ti SİKS)",
+     "Zamanı belirtmek için kullanılır.",
+     "AT + saat: at 5 o'clock | ON + gün: on Monday | IN + ay/yıl: in July, in 2026",
      "⚠️ Türkçe'de saat için 'de/da' eklenir, İngilizce'de 'at' kullanılır."),
-
     ("Ders 17: Sıklık Zarfları",
-     "Bir eylemin ne sıklıkta yapıldığını gösterir. Genellikle fiilden önce gelir.",
-     "Always (OL-veys) = Her zaman (%100) | Usually (YU-jı-li) = Genellikle (%90) | Often (O-fın) = Sık sık (%70) | Sometimes (SAM-teymz) = Bazen (%50) | Rarely (RER-li) = Nadiren (%10) | Never (NE-vır) = Asla (%0)",
-     "Örnek: I usually walk to work (ay YU-jı-li VOK tu VIRK) = Genellikle işe yürürüm."),
-
+     "Bir eylemin ne sıklıkta yapıldığını gösterir.",
+     "Always (%100) | Usually (%90) | Often (%70) | Sometimes (%50) | Rarely (%10) | Never (%0)",
+     "Örnek: I usually walk to work = Genellikle işe yürürüm."),
     ("Ders 18: Sayılabilen ve Sayılamayan İsimler",
-     "Bazı isimler sayılabilir (bir, iki, üç), bazıları sayılamaz (su, ekmek, para).",
+     "Bazı isimler sayılabilir, bazıları sayılamaz.",
      "Sayılabilen: apple, book, car → 'How many?' | Sayılamayan: water, bread, money → 'How much?'",
-     "Örnek: How many books? (hau ME-ni BUKS) = Kaç kitap? | How much water? (hau MAÇ VO-tır) = Ne kadar su?"),
-
+     "Örnek: How many books? = Kaç kitap? | How much water? = Ne kadar su?"),
     ("Ders 19: Much / Many / A lot of",
-     "Miktar belirtmek için kullanılır. Sayılamayan için 'much', sayılabilen için 'many', ikisi için 'a lot of' kullanılır.",
-     "Many books (ME-ni BUKS) = Çok kitap | Much water (MAÇ VO-tır) = Çok su | A lot of books (ı LOT ov BUKS) = Çok kitap | A few books (ı FYU BUKS) = Birkaç kitap | A little water (ı Lİ-tıl VO-tır) = Biraz su",
+     "Miktar belirtmek için kullanılır.",
+     "Many books | Much water | A lot of books | A few books | A little water",
      "⚠️ Olumsuz ve soru cümlelerinde 'much/many' kullanılır."),
-
     ("Ders 20: Modal Fiiller",
      "Tavsiye, zorunluluk, izin belirtmek için kullanılır.",
-     "Should (ŞUD) = -meli, -malı (tavsiye) | Must (MAST) = -meli, -malı (zorunluluk) | Have to (HEV tu) = -mek zorunda | Could (KUD) = -ebilir (kibarca) | Might (MAYT) = -ebilir (olasılık)",
-     "Örnek: You should rest (yu ŞUD REST) = Dinlenmelisin. | I must go (ay MAST GOU) = Gitmeliyim."),
-
+     "Should (-meli) | Must (-meli) | Have to (-mek zorunda) | Could (-ebilir) | Might (-ebilir)",
+     "Örnek: You should rest = Dinlenmelisin. | I must go = Gitmeliyim."),
     ("Ders 21: Geçmiş Zaman Soruları",
-     "Geçmişte olan olayları soru şeklinde sormak için 'did' kullanılır. Ana fiil yalın hale döner.",
-     "Did you go? (did yu GOU) = Gittin mi? | Did she come? (did şi KAM) = Geldi mi? | Where did you go? (VER did yu GOU) = Nereye gittin? | I didn't go (ay Dİ-dınt GOU) = Gitmedim",
-     "⚠️ 'Did' ile fiil yalın kalır, -ed almaz: Did you went? ❌"),
-
+     "Geçmişte olan olayları soru şeklinde sormak için 'did' kullanılır.",
+     "Did you go? | Did she come? | Where did you go? | I didn't go",
+     "⚠️ 'Did' ile fiil yalın kalır, -ed almaz."),
     ("Ders 22: Present Perfect",
-     "Geçmişte başlayıp şu ana kadar devam eden olayları anlatır. 'have/has + V3' şeklinde kurulur.",
-     "I have worked (ay hev VIRKT) = Çalıştım (ve hâlâ çalışıyorum) | She has gone (şi hez GON) = Gitti (ve hâlâ yok) | Have you ever been? (hev yu E-vır BİİN) = Hiç bulundun mu?",
-     "💡 'For' ve 'since' ile sık kullanılır: for 3 years, since 2020."),
-
+     "Geçmişte başlayıp şu ana kadar devam eden olayları anlatır.",
+     "I have worked | She has gone | Have you ever been? | I have never seen",
+     "💡 'For' ve 'since' ile sık kullanılır."),
     ("Ders 23: If Cümleleri (1. Tip)",
-     "Gerçekleşme olasılığı yüksek koşullar için kullanılır. 'If + geniş zaman, will + fiil' şeklinde kurulur.",
-     "If it rains, I will stay home (if it REYNS, ay vil STEY HOUM) = Yağmur yağarsa evde kalırım. | If you study, you will pass (if yu STA-di, yu vil PES) = Çalışırsan geçersin.",
+     "Gerçekleşme olasılığı yüksek koşullar için kullanılır.",
+     "If it rains, I will stay home | If you study, you will pass",
      "💡 'If' cümlesi başta veya sonda olabilir."),
-
     ("Ders 24: Edilgen Yapı (Passive)",
-     "Eylemi yapan kişi önemli değilse veya bilinmiyorsa kullanılır. 'be + V3' şeklinde kurulur.",
-     "The letter was sent (dı LE-tır vaz SENT) = Mektup gönderildi. | The house is being built (dı HAUS iz Bİ-ing BİLT) = Ev inşa ediliyor. | English is spoken here (İNG-liş iz SPOU-kın hiır) = Burada İngilizce konuşulur.",
+     "Eylemi yapan kişi önemli değilse kullanılır.",
+     "The letter was sent | The house is being built | English is spoken here",
      "💡 Türkçe'de edilgen yapı '-ıl, -il' ekleriyle kurulur."),
-
     ("Ders 25: İlgi Cümleleri (Who, Which, That)",
-     "İki cümleyi birleştirmek için kullanılır. İnsanlar için 'who', nesneler için 'which', ikisi için 'that' kullanılır.",
-     "The man who came (dı MEN hu KEYM) = Gelen adam | The book which I read (dı BUK viç ay RİİD) = Okuduğum kitap | The car that I bought (dı KAR dhet ay BOT) = Aldığım araba",
+     "İki cümleyi birleştirmek için kullanılır.",
+     "The man who came | The book which I read | The car that I bought",
      "💡 Bu yapı Türkçe'deki '-en, -an' sıfat fiil eklerine benzer."),
-
     ("Ders 26: Bağlaçlar",
      "Cümleleri ve fikirleri birleştirmek için kullanılır.",
-     "And (end) = ve | But (bat) = ama | Or (or) = veya | Because (bi-KOZ) = çünkü | So (sou) = bu yüzden | Although (ol-DHOU) = -e rağmen | However (hau-E-vır) = ancak",
+     "And (ve) | But (ama) | Or (veya) | Because (çünkü) | So (bu yüzden) | Although (-e rağmen) | However (ancak)",
      "Örnek: I like tea but I don't like coffee."),
-
     ("Ders 27: Dolaylı Anlatım",
-     "Başkasının söylediğini aktarmak için kullanılır. Zaman bir adım geriye kayar.",
-     "'I am tired' dedi → He said he was tired. | 'I will come' dedi → She said she would come. | 'I went' dedi → He said he had gone.",
+     "Başkasının söylediğini aktarmak için kullanılır.",
+     "'I am tired' → He said he was tired. | 'I will come' → She said she would come.",
      "💡 'Say' ve 'tell' farkı: Say + bir şey, Tell + birine"),
-
     ("Ders 28: Kısaltmalar ve Günlük Konuşma",
-     "Günlük İngilizce'de çok kullanılan kısaltmalar ve konuşma dilinde yaygın ifadeler.",
-     "I'm = I am (aym) | You're = You are (yor) | He's = He is (hiz) | Don't = Do not (dont) | Can't = Cannot (kent) | Won't = Will not (vont)",
-     "⚠️ Kısaltmalar günlük konuşmada yaygın ama resmi yazışmalarda açık hali kullanılır."),
-
+     "Günlük İngilizce'de çok kullanılan kısaltmalar.",
+     "I'm = I am | You're = You are | He's = He is | Don't = Do not | Can't = Cannot | Won't = Will not",
+     "⚠️ Kısaltmalar günlük konuşmada yaygın."),
     ("Ders 29: Yaygın Deyimler",
-     "İngilizce'de sık kullanılan deyimler ve kalıplaşmış ifadeler.",
-     "Break the ice (breyk dı AYS) = Buzları eritmek | Piece of cake (PİİS ov KEYK) = Çok kolay iş | Hit the books (HİT dı BUKS) = Ders çalışmak | Under the weather (AN-dır dı VE-dhır) = Keyifsiz olmak | Once in a blue moon (VANS in ı BLU MUUN) = Kırk yılda bir",
-     "💡 Deyimler kelime kelime çevrilemez, kalıp olarak öğrenilir."),
-
+     "İngilizce'de sık kullanılan deyimler.",
+     "Break the ice | Piece of cake | Hit the books | Under the weather | Once in a blue moon",
+     "💡 Deyimler kelime kelime çevrilemez."),
     ("Ders 30: Genel Tekrar ve Sınav",
-     "Tüm konuların özeti ve kendinizi test etme.",
-     "To be: am/is/are | Zamanlar: geniş, şimdiki, geçmiş, gelecek | Soru: What, Where, When, Why, How | Modal: can, should, must, could, might | Edatlar: in, on, at | Cümle yapısı: Özne + Fiil + Nesne",
+     "Tüm konuların özeti.",
+     "To be | Zamanlar | Soru | Modal | Edatlar | Cümle yapısı",
      "🎯 Bu 30 ders sonunda A1-A2 seviyesine ulaşmış olacaksınız."),
 ]
 
 # ============================================================
-# BÖLÜM 4: GÜNLÜK ALIŞTIRMALAR (5 SORU)
+# BÖLÜM 4: BAĞLAM HİKAYELERİ (10 HİKAYE)
+# ============================================================
+BAGLAM_HIKAYELERI = [
+    {
+        "baslik": "Ofisteki İlk Gün",
+        "hikaye": "Sarah: Hello! Are you the new employee?\nYusuf: Yes, I am. Nice to meet you.\nSarah: Nice to meet you too. Where are you from?\nYusuf: I'm from Turkey. I'm starting today.\nSarah: Welcome! Let's get started. I'll show you your desk.",
+        "ceviri": "Sarah: Merhaba! Yeni çalışan sen misin?\nYusuf: Evet, benim. Tanıştığımıza memnun oldum.\nSarah: Ben de. Nerelisin?\nYusuf: Türkiye'denim. Bugün başlıyorum.\nSarah: Hoş geldin! Başlayalım. Masanı göstereceğim.",
+        "kaliplar": ["Hello!", "Nice to meet you", "Where are you from?", "I'm from Turkey", "Let's get started"]
+    },
+    {
+        "baslik": "Restoranda Akşam Yemeği",
+        "hikaye": "Waiter: Good evening! A table for two?\nYusuf: Yes, please.\nWaiter: Here is the menu. What would you like to drink?\nYusuf: Could I have some water, please?\nWaiter: Of course. Are you ready to order?\nYusuf: Yes. What do you recommend?",
+        "ceviri": "Garson: İyi akşamlar! İki kişilik masa?\nYusuf: Evet, lütfen.\nGarson: Menü burada. Ne içmek istersiniz?\nYusuf: Biraz su alabilir miyim?\nGarson: Elbette. Sipariş vermeye hazır mısınız?\nYusuf: Evet. Ne tavsiye edersiniz?",
+        "kaliplar": ["Good evening!", "A table for two, please", "Could I have some water?", "What do you recommend?"]
+    },
+    {
+        "baslik": "Havaalanında",
+        "hikaye": "Yusuf: Excuse me, where is the check-in counter?\nStaff: It's over there, next to the coffee shop.\nYusuf: Thank you. What time is boarding?\nStaff: Boarding starts at 3 PM.\nYusuf: Great. Where is the bathroom?\nStaff: Just behind the security check.",
+        "ceviri": "Yusuf: Affedersiniz, check-in bankosu nerede?\nGörevli: Şurada, kahve dükkanının yanında.\nYusuf: Teşekkürler. Uçuş saati kaçta?\nGörevli: Saat 15:00'te başlıyor.\nYusuf: Harika. Tuvalet nerede?\nGörevli: Güvenlik kontrolünün hemen arkasında.",
+        "kaliplar": ["Excuse me", "Where is the check-in counter?", "What time is...?", "Where is the bathroom?"]
+    },
+    {
+        "baslik": "Mağazada Alışveriş",
+        "hikaye": "Yusuf: Excuse me, how much is this shirt?\nStaff: It's 50 dollars.\nYusuf: Do you have this in a different size?\nStaff: Yes, what size do you need?\nYusuf: Medium, please. Can I try it on?\nStaff: Of course. The fitting room is over there.",
+        "ceviri": "Yusuf: Affedersiniz, bu gömlek ne kadar?\nGörevli: 50 dolar.\nYusuf: Farklı bedeni var mı?\nGörevli: Evet, hangi beden lazım?\nYusuf: Medium, lütfen. Deneyebilir miyim?\nGörevli: Elbette. Deneme kabini şurada.",
+        "kaliplar": ["How much is this?", "Do you have this in a different size?", "Can I try it on?", "Of course"]
+    },
+    {
+        "baslik": "İş Toplantısı",
+        "hikaye": "Manager: Let's get started. Could you give me an update?\nYusuf: Yes. The project is going well, but we're running behind schedule.\nManager: What's the deadline?\nYusuf: Next Friday. I'll send you the details.\nManager: That makes sense. Let's schedule a meeting.",
+        "ceviri": "Yönetici: Başlayalım. Güncel durumu aktarır mısın?\nYusuf: Evet. Proje iyi gidiyor ama programın gerisindeyiz.\nYönetici: Son tarih ne zaman?\nYusuf: Önümüzdeki Cuma. Detayları göndereceğim.\nYönetici: Mantıklı. Bir toplantı planlayalım.",
+        "kaliplar": ["Let's get started", "Could you give me an update?", "What's the deadline?", "That makes sense"]
+    },
+    {
+        "baslik": "Arkadaşla Buluşma",
+        "hikaye": "Sarah: Hey! How's it going?\nYusuf: Not much, just working. How was your weekend?\nSarah: It was great! Do you want to hang out tonight?\nYusuf: I'd love to! What time?\nSarah: Let's go out at 7.\nYusuf: Sounds like a plan!",
+        "ceviri": "Sarah: Hey! Nasıl gidiyor?\nYusuf: Pek bir şey yok, çalışıyorum. Hafta sonun nasıldı?\nSarah: Harikaydı! Bu akşam takılmak ister misin?\nYusuf: Çok isterim! Saat kaçta?\nSarah: 7'de çıkalım.\nYusuf: Plan gibi görünüyor!",
+        "kaliplar": ["How's it going?", "Not much", "Do you want to hang out?", "I'd love to", "Sounds like a plan"]
+    },
+    {
+        "baslik": "Otelde Check-in",
+        "hikaye": "Yusuf: Hello, I have a reservation under the name Smith.\nStaff: Welcome! Yes, I see it. Two nights, correct?\nYusuf: Yes. Is breakfast included?\nStaff: Yes, breakfast is from 7 to 10.\nYusuf: Great. What time is check-out?\nStaff: Check-out is at 11 AM.",
+        "ceviri": "Yusuf: Merhaba, Smith adına rezervasyonum var.\nGörevli: Hoş geldiniz! Evet, görüyorum. İki gece, doğru mu?\nYusuf: Evet. Kahvaltı dahil mi?\nGörevli: Evet, kahvaltı 7'den 10'a kadar.\nYusuf: Harika. Çıkış saati kaçta?\nGörevli: Çıkış 11:00'de.",
+        "kaliplar": ["I have a reservation", "Is breakfast included?", "What time is check-out?", "Welcome!"]
+    },
+    {
+        "baslik": "Telefon Görüşmesi",
+        "hikaye": "Yusuf: Hello, may I speak to Mr. Smith?\nSecretary: Could you hold on a moment, please?\nYusuf: Of course.\nSecretary: I'm sorry, he's in a meeting. May I take a message?\nYusuf: Yes, please tell him Yusuf called.\nSecretary: I'll transfer you to his voicemail.",
+        "ceviri": "Yusuf: Merhaba, Bay Smith ile görüşebilir miyim?\nSekreter: Bir dakika bekler misiniz?\nYusuf: Elbette.\nSekreter: Üzgünüm, toplantıda. Mesaj alabilir miyim?\nYusuf: Evet, lütfen Yusuf aradı deyin.\nSekreter: Sizi sesli mesaja yönlendireceğim.",
+        "kaliplar": ["May I speak to...?", "Could you hold on a moment?", "May I take a message?", "I'll transfer you"]
+    },
+    {
+        "baslik": "Sunum Yapma",
+        "hikaye": "Yusuf: Good morning, everyone. Thank you for your attention.\nLet's move on to the next point. As you can see from the chart, sales increased by 10%.\nThere was a slight decrease in profit, but we need to cut costs.\nAny questions?",
+        "ceviri": "Yusuf: Günaydın millet. İlginiz için teşekkürler.\nBir sonraki konuya geçelim. Grafikten görebileceğiniz gibi satışlar %10 arttı.\nKârda hafif bir düşüş oldu ama maliyetleri düşürmeliyiz.\nSoru var mı?",
+        "kaliplar": ["Thank you for your attention", "Let's move on", "As you can see from the chart", "Any questions?"]
+    },
+    {
+        "baslik": "Yardım İsteme",
+        "hikaye": "Yusuf: Excuse me, could you help me?\nStranger: Of course. What's the problem?\nYusuf: I'm lost. Can you help me find the station?\nStranger: Sure. Go straight, then turn left.\nYusuf: Thank you so much!\nStranger: No problem. Have a nice day!",
+        "ceviri": "Yusuf: Affedersiniz, yardım eder misiniz?\nYabancı: Elbette. Sorun nedir?\nYusuf: Kayboldum. İstasyonu bulmama yardım eder misiniz?\nYabancı: Tabii. Düz gidin, sonra sola dönün.\nYusuf: Çok teşekkürler!\nYabancı: Sorun değil. İyi günler!",
+        "kaliplar": ["Could you help me?", "I'm lost", "Go straight, then turn left", "No problem", "Have a nice day"]
+    },
+]
+
+# ============================================================
+# BÖLÜM 5: ÇOKLU ALIŞTIRMA TİPLERİ
 # ============================================================
 ALISTIRMALAR = [
     {
+        "tip": "boşluk_doldurma",
         "sorular": [
-            ("Boşluğu doldur: I ___ a teacher.", "am", "Ben bir öğretmenim."),
-            ("'Merhaba, nasılsın?' İngilizce nasıl denir?", "Hello, how are you?", "Selamlaşma kalıbı"),
-            ("Çevir: 'Ben kitap okuyorum.' (şu an)", "I am reading a book.", "Şimdiki zaman"),
-            ("Boşluğu doldur: She ___ (work) here.", "works", "He/She/It + fiil+s"),
-            ("Çevir: 'Dün çalıştım.'", "I worked yesterday.", "Geçmiş zaman"),
+            ("I ___ a teacher.", "am", "To be fiili - I için"),
+            ("She ___ (work) here.", "works", "He/She/It + fiil+s"),
+            ("They ___ (play) football now.", "are playing", "Şimdiki zaman"),
+            ("___ there any milk?", "Is", "There is/are"),
+            ("I ___ (go) to school every day.", "go", "Geniş zaman"),
         ]
     },
     {
+        "tip": "doğru_yanlış",
         "sorular": [
-            ("Boşluğu doldur: Where ___ you from?", "are", "Soru cümlesi"),
-            ("Çevir: 'İki kitabım var.'", "I have two books.", "Çoğul"),
-            ("Boşluğu doldur: I ___ (go) to school every day.", "go", "Geniş zaman"),
-            ("'Teşekkür ederim' İngilizce nasıl denir?", "Thank you.", "Nezaket"),
-            ("Çevir: 'Yarın geleceğim.'", "I will come tomorrow.", "Gelecek zaman"),
+            ("'I am a doctor' cümlesi doğru mu?", "Doğru", "To be doğru kullanılmış"),
+            ("'She work here' cümlesi doğru mu?", "Yanlış", "She works olmalı"),
+            ("'They is happy' cümlesi doğru mu?", "Yanlış", "They are happy olmalı"),
+            ("'I don't like coffee' cümlesi doğru mu?", "Doğru", "Olumsuz yapı doğru"),
+            ("'Where you are from?' cümlesi doğru mu?", "Yanlış", "Where are you from? olmalı"),
         ]
     },
     {
+        "tip": "eşleştirme",
         "sorular": [
-            ("Boşluğu doldur: This ___ my book.", "is", "İşaret zamiri"),
-            ("Çevir: 'Onun adı ne?'", "What is her name?", "Sahiplik"),
-            ("Boşluğu doldur: I can ___ (swim).", "swim", "Can + yalın fiil"),
-            ("'Anlamıyorum' İngilizce nasıl denir?", "I don't understand.", "Yardım"),
-            ("Çevir: 'O bir doktor.'", "He is a doctor. / She is a doctor.", "To be"),
+            ("Hello", "Merhaba", "Selamlaşma"),
+            ("Thank you", "Teşekkür ederim", "Nezaket"),
+            ("Excuse me", "Affedersiniz", "Nezaket"),
+            ("Good night", "İyi geceler", "Vedalaşma"),
+            ("See you later", "Sonra görüşürüz", "Vedalaşma"),
         ]
     },
     {
+        "tip": "çeviri",
         "sorular": [
-            ("Boşluğu doldur: They ___ (play) football now.", "are playing", "Şimdiki zaman"),
-            ("Çevir: 'Kaç yaşındasın?'", "How old are you?", "Soru"),
-            ("Boşluğu doldur: ___ there any milk?", "Is", "There is/are"),
-            ("'Affedersiniz' İngilizce nasıl denir?", "Excuse me.", "Nezaket"),
-            ("Çevir: 'Bu ne kadar?'", "How much is this?", "Alışveriş"),
-        ]
-    },
-    {
-        "sorular": [
-            ("Boşluğu doldur: She ___ (not/work) on Sundays.", "doesn't work", "Olumsuz"),
-            ("Çevir: 'Nerede yaşıyorsun?'", "Where do you live?", "Soru"),
-            ("Boşluğu doldur: I ___ (be) at home yesterday.", "was", "Geçmiş zaman to be"),
-            ("'Hoşça kal' İngilizce nasıl denir?", "Goodbye. / See you.", "Vedalaşma"),
-            ("Çevir: 'Yardım edebilir misin?'", "Can you help me?", "Rica"),
+            ("Ben bir öğretmenim.", "I am a teacher.", "To be"),
+            ("Dün çalıştım.", "I worked yesterday.", "Geçmiş zaman"),
+            ("Yarın geleceğim.", "I will come tomorrow.", "Gelecek zaman"),
+            ("İki kitabım var.", "I have two books.", "Çoğul"),
+            ("Nerede yaşıyorsun?", "Where do you live?", "Soru"),
         ]
     },
 ]
@@ -636,16 +748,56 @@ def gunun_alistirmasi():
     gun = datetime.now().timetuple().tm_yday
     return ALISTIRMALAR[gun % len(ALISTIRMALAR)]
 
+def gunun_hikayesi():
+    gun = datetime.now().timetuple().tm_yday
+    return BAGLAM_HIKAYELERI[gun % len(BAGLAM_HIKAYELERI)]
+
+def haftalik_ozet(state):
+    """Pazar günü özel özet."""
+    total = state.get("total_lessons", 0)
+    streak = state.get("streak", 0)
+    correct = state.get("total_correct", 0)
+    wrong = state.get("total_wrong", 0)
+    
+    return {
+        "toplam_ders": total,
+        "streak": streak,
+        "doğru": correct,
+        "yanlış": wrong,
+        "başarı_oranı": round(correct / (correct + wrong) * 100, 1) if (correct + wrong) > 0 else 0
+    }
+
 def e_posta_gonder():
     tarih = datetime.now().strftime('%d.%m.%Y %A')
+    gun_no = datetime.now().weekday()  # 0=Pazartesi, 6=Pazar
+    
+    # State yükle/güncelle
+    state = load_state()
+    state = update_streak(state)
+    
     telaffuz = gunun_telaffuz_dersi()
     kaliplar = gunun_kaliplari()
     gramer = gunun_gramer_dersi()
     alistirma = gunun_alistirmasi()
+    hikaye = gunun_hikayesi()
     
-    # ====== TELAFFUZ BÖLÜMÜ ======
+    streak_msg = get_streak_message(state["streak"])
+    
+    # ====== HEADER ======
+    header_html = f'''
+    <div style="background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%); color: white; padding: 25px; border-radius: 12px; text-align: center;">
+        <h1 style="margin: 0; font-size: 26px;">🎓 GÜNLÜK İNGİLİZCE DERSİ</h1>
+        <p style="margin: 8px 0 0 0; font-size: 14px;">{tarih}</p>
+        <div style="background: rgba(255,255,255,0.15); border-radius: 20px; padding: 8px 20px; display: inline-block; margin-top: 10px;">
+            <strong>{streak_msg}</strong>
+        </div>
+        <p style="margin: 8px 0 0 0; opacity: 0.9; font-size: 12px;">
+        📊 Toplam Ders: {state["total_lessons"]} · Bu Ders: 15 dk</p>
+    </div>'''
+    
+    # ====== TELAFFUZ ======
     telaffuz_html = f'''
-    <div style="background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%); color: white; padding: 20px; border-radius: 12px;">
+    <div style="background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%); color: white; padding: 20px; border-radius: 12px; margin-top: 20px;">
         <h2 style="margin: 0;">🗣️ 1. TELAFFUZ DERSİ (4 dakika)</h2>
         <h3 style="margin: 8px 0; color: #fff;">{telaffuz["baslik"]}</h3>
     </div>
@@ -670,9 +822,14 @@ def e_posta_gonder():
     </div>
     <div style="background: #d4edda; padding: 15px; border-left: 5px solid #28a745; margin: 10px 0;">
         <p><strong>💡 Pratik İpucu:</strong> {telaffuz["ipucu"]}</p>
+    </div>
+    <div style="background: #e7f3ff; padding: 15px; border-left: 5px solid #3498db; margin: 10px 0;">
+        <p><strong>🎤 SESLİ PRATİK:</strong> Yukarıdaki 8 kelimeyi 3 kez SESLİ okuyun. 
+        Telefonunuzun ses kayıt uygulamasını açın, kendinizi kaydedin ve dinleyin. 
+        Kendi sesinizi duymak, telaffuzunuzu düzeltmenin en hızlı yoludur.</p>
     </div>'''
     
-    # ====== KALIP BÖLÜMÜ ======
+    # ====== KALIPLAR ======
     kalip_html = '''
     <div style="background: linear-gradient(135deg, #3498db 0%, #2980b9 100%); color: white; padding: 20px; border-radius: 12px; margin-top: 20px;">
         <h2 style="margin: 0;">📖 2. KALIP DERSİ (5 dakika)</h2>
@@ -697,10 +854,31 @@ def e_posta_gonder():
         </tr>'''
     kalip_html += '</table>'
     
-    # ====== GRAMER BÖLÜMÜ ======
+    # ====== BAĞLAM HİKAYESİ ======
+    hikaye_html = f'''
+    <div style="background: linear-gradient(135deg, #f39c12 0%, #d35400 100%); color: white; padding: 20px; border-radius: 12px; margin-top: 20px;">
+        <h2 style="margin: 0;">📚 3. BAĞLAM HİKAYESİ (3 dakika)</h2>
+        <h3 style="margin: 8px 0; color: #fff;">{hikaye["baslik"]}</h3>
+    </div>
+    <div style="background: #fef5e7; padding: 15px; border-left: 5px solid #f39c12; margin: 10px 0;">
+        <p><strong>📖 Hikaye (İngilizce):</strong></p>
+        <p style="white-space: pre-line; font-size: 14px; line-height: 1.7;">{hikaye["hikaye"]}</p>
+    </div>
+    <div style="background: #e8f8f5; padding: 15px; border-left: 5px solid #27ae60; margin: 10px 0;">
+        <p><strong>🇹🇷 Türkçe Çeviri:</strong></p>
+        <p style="white-space: pre-line; font-size: 13px; color: #555;">{hikaye["ceviri"]}</p>
+    </div>
+    <div style="background: #fff9e6; padding: 15px; border-left: 5px solid #f1c40f; margin: 10px 0;">
+        <p><strong>🎯 Bu Hikayedeki Kalıplar:</strong></p>
+        <ul>'''
+    for kal in hikaye["kaliplar"]:
+        hikaye_html += f'<li>{kal}</li>'
+    hikaye_html += '</ul></div>'
+    
+    # ====== GRAMER ======
     gramer_html = f'''
     <div style="background: linear-gradient(135deg, #27ae60 0%, #16a085 100%); color: white; padding: 20px; border-radius: 12px; margin-top: 20px;">
-        <h2 style="margin: 0;">📝 3. GRAMER DERSİ (3 dakika)</h2>
+        <h2 style="margin: 0;">📝 4. GRAMER DERSİ (3 dakika)</h2>
         <h3 style="margin: 8px 0; color: #fff;">{gramer[0]}</h3>
     </div>
     <div style="background: #e8f8f5; padding: 15px; border-left: 5px solid #27ae60; margin: 10px 0;">
@@ -714,30 +892,57 @@ def e_posta_gonder():
         <p><strong>💡 Örnek:</strong> {gramer[3]}</p>
     </div>'''
     
-    # ====== ALIŞTIRMA BÖLÜMÜ ======
-    alistirma_html = '''
+    # ====== ALIŞTIRMA ======
+    tip_isimleri = {
+        "boşluk_doldurma": "Boşluk Doldurma",
+        "doğru_yanlış": "Doğru / Yanlış",
+        "eşleştirme": "Eşleştirme",
+        "çeviri": "Çeviri"
+    }
+    alistirma_html = f'''
     <div style="background: linear-gradient(135deg, #9b59b6 0%, #8e44ad 100%); color: white; padding: 20px; border-radius: 12px; margin-top: 20px;">
-        <h2 style="margin: 0;">🎯 4. MİNİ ALIŞTIRMA (2 dakika)</h2>
-        <p style="margin: 8px 0 0 0;">5 soru — kendinizi test edin</p>
+        <h2 style="margin: 0;">🎯 5. MİNİ ALIŞTIRMA (2 dakika)</h2>
+        <p style="margin: 8px 0 0 0;">Tip: {tip_isimleri.get(alistirma["tip"], alistirma["tip"])}</p>
     </div>
     <div style="background: #f5eef8; padding: 15px; border-left: 5px solid #9b59b6; margin: 10px 0;">'''
-    for i, (soru, cevap, aciklama) in enumerate(alistirma["sorular"], 1):
-        alistirma_html += f'<p style="margin: 8px 0;"><strong>{i}.</strong> {soru}</p>'
-    alistirma_html += '<hr><p><strong>✅ Cevaplar:</strong></p>'
-    for i, (soru, cevap, aciklama) in enumerate(alistirma["sorular"], 1):
-        alistirma_html += f'<p style="margin: 5px 0;"><strong>{i}.</strong> {cevap} <em>({aciklama})</em></p>'
+    
+    for i, soru in enumerate(alistirma["sorular"], 1):
+        alistirma_html += f'<p style="margin: 8px 0;"><strong>{i}.</strong> {soru[0]}</p>'
+    
+    alistirma_html += '<hr style="margin: 15px 0;"><p><strong>✅ Cevaplar:</strong></p>'
+    for i, soru in enumerate(alistirma["sorular"], 1):
+        if len(soru) >= 3:
+            alistirma_html += f'<p style="margin: 5px 0;"><strong>{i}.</strong> {soru[1]} <em style="color: #7f8c8d;">({soru[2]})</em></p>'
+        else:
+            alistirma_html += f'<p style="margin: 5px 0;"><strong>{i}.</strong> {soru[1]}</p>'
     alistirma_html += '</div>'
+    
+    # ====== HAFTALIK ÖZET (Pazar günü) ======
+    haftalik_html = ""
+    if gun_no == 6:  # Pazar
+        ozet = haftalik_ozet(state)
+        haftalik_html = f'''
+        <div style="background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%); color: white; padding: 25px; border-radius: 12px; margin-top: 20px;">
+            <h2 style="margin: 0;">📅 HAFTALIK DEĞERLENDİRME</h2>
+            <p style="margin: 8px 0 0 0;">Bu haftanın özeti</p>
+        </div>
+        <div style="background: #fdedec; padding: 20px; border-left: 5px solid #e74c3c; margin: 10px 0;">
+            <table style="width: 100%; font-size: 14px;">
+            <tr><td><strong>🔥 Seri:</strong></td><td>{ozet["streak"]} gün</td></tr>
+            <tr><td><strong>📚 Toplam Ders:</strong></td><td>{ozet["toplam_ders"]} ders</td></tr>
+            <tr><td><strong>✅ Doğru Cevap:</strong></td><td>{ozet["doğru"]}</td></tr>
+            <tr><td><strong>❌ Yanlış Cevap:</strong></td><td>{ozet["yanlış"]}</td></tr>
+            <tr><td><strong>🎯 Başarı Oranı:</strong></td><td>%{ozet["başarı_oranı"]}</td></tr>
+            </table>
+            <p style="margin-top: 15px;"><strong>🎯 Gelecek Hafta Hedefi:</strong> 
+            Her gün derse devam et, telaffuz pratiğini ihmal etme, yeni kalıpları sesli tekrarla.</p>
+        </div>'''
     
     # ====== ANA HTML ======
     html_body = f'''
     <html><body style="font-family: Arial, sans-serif; max-width: 1000px; margin: auto; background: #ecf0f1; padding: 15px;">
     
-    <div style="background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%); color: white; padding: 25px; border-radius: 12px; text-align: center;">
-        <h1 style="margin: 0; font-size: 26px;">🎓 GÜNLÜK İNGİLİZCE DERSİ</h1>
-        <p style="margin: 8px 0 0 0; font-size: 14px;">{tarih}</p>
-        <p style="margin: 8px 0 0 0; opacity: 0.9; font-size: 12px;">
-        ⏱️ Toplam 15 dakika: Telaffuz (4) + Kalıp (5) + Gramer (3) + Alıştırma (2) + Tekrar (1)</p>
-    </div>
+    {header_html}
     
     <div style="background: white; padding: 20px; margin-top: 15px; border-radius: 12px;">
     {telaffuz_html}
@@ -748,6 +953,10 @@ def e_posta_gonder():
     </div>
     
     <div style="background: white; padding: 20px; margin-top: 15px; border-radius: 12px;">
+    {hikaye_html}
+    </div>
+    
+    <div style="background: white; padding: 20px; margin-top: 15px; border-radius: 12px;">
     {gramer_html}
     </div>
     
@@ -755,17 +964,24 @@ def e_posta_gonder():
     {alistirma_html}
     </div>
     
-    <div style="background: #34495e; color: white; padding: 15px; margin-top: 15px; border-radius: 12px; font-size: 11px; text-align: center;">
-    <strong>📌 NASIL ÇALIŞMALISINIZ?</strong><br>
-    1️⃣ Telaffuz dersini SESLİ okuyun (4 dk) → 2️⃣ 15 kalıbı SESLİ tekrarlayın (5 dk)<br>
-    3️⃣ Gramer dersini okuyun ve 3 örnek cümle kurun (3 dk) → 4️⃣ Alıştırmayı yapın (2 dk)<br>
-    5️⃣ Dünkü kalıplardan 10 tanesini gözden geçirin (1 dk)
+    {haftalik_html}
+    
+    <div style="background: #34495e; color: white; padding: 20px; margin-top: 15px; border-radius: 12px; font-size: 12px;">
+    <strong style="font-size: 14px;">📌 NASIL ÇALIŞMALISINIZ? (15 dakika)</strong><br><br>
+    <strong>1️⃣ Telaffuz (4 dk):</strong> Dersi SESLİ okuyun. 8 kelimeyi 3 kez tekrarlayın.<br>
+    <strong>2️⃣ Kalıplar (5 dk):</strong> 15 kalıbı SESLİ okuyun. Her kalıba kendi cümlenizi ekleyin.<br>
+    <strong>3️⃣ Hikaye (3 dk):</strong> Hikayeyi okuyun, anlamadığınız kelimeleri işaretleyin.<br>
+    <strong>4️⃣ Gramer (3 dk):</strong> Kuralı okuyun. 3 örnek cümle kurun.<br>
+    <strong>5️⃣ Alıştırma (2 dk):</strong> Soruları cevaplayın, sonra cevaplara bakın.<br>
+    <br>
+    <strong>💡 İPUCU:</strong> Her gün aynı saatte çalışın. Kahvaltıda, işe giderken veya akşam yatmadan önce. 
+    Düzenlilik, süreden daha önemli. 15 dakika × 30 gün = Akıcı konuşma!
     </div>
     </body></html>
     '''
     
     msg = MIMEMultipart('alternative')
-    msg['Subject'] = f"🎓 İngilizce Dersi - {datetime.now().strftime('%d.%m.%Y')}"
+    msg['Subject'] = f"🎓 İngilizce Dersi #{state['total_lessons']} - {datetime.now().strftime('%d.%m.%Y')}"
     msg['From'] = MAIL_USER
     msg['To'] = MAIL_TO
     msg.attach(MIMEText(html_body, 'html', 'utf-8'))
@@ -774,9 +990,12 @@ def e_posta_gonder():
         with smtplib.SMTP_SSL('smtp.gmail.com', 465) as server:
             server.login(MAIL_USER, MAIL_PASS)
             server.sendmail(MAIL_USER, MAIL_TO, msg.as_string())
-        print("✅ E-posta gönderildi.")
+        print(f"✅ E-posta gönderildi. Ders #{state['total_lessons']}, Streak: {state['streak']}")
     except Exception as e:
         print(f"❌ Hata: {e}")
+    
+    # State'i kaydet
+    save_state(state)
 
 if __name__ == "__main__":
     print("İngilizce dersi hazırlanıyor...")
